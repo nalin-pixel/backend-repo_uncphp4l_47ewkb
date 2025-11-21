@@ -11,8 +11,8 @@ Model name is converted to lowercase for the collection name:
 - BlogPost -> "blogs" collection
 """
 
-from pydantic import BaseModel, Field
-from typing import Optional
+from pydantic import BaseModel, Field, EmailStr
+from typing import Optional, Literal
 
 # Example schemas (replace with your own):
 
@@ -38,11 +38,18 @@ class Product(BaseModel):
     category: str = Field(..., description="Product category")
     in_stock: bool = Field(True, description="Whether product is in stock")
 
-# Add your own schemas here:
-# --------------------------------------------------
-
-# Note: The Flames database viewer will automatically:
-# 1. Read these schemas from GET /schema endpoint
-# 2. Use them for document validation when creating/editing
-# 3. Handle all database operations (CRUD) directly
-# 4. You don't need to create any database endpoints!
+# Phone unlock request schema used by the app
+class UnlockRequest(BaseModel):
+    """
+    Unlock requests from the multistep form
+    Collection name: "unlockrequest" (lowercase of class name)
+    """
+    brand: str = Field(..., description="Device brand, e.g., Apple, Samsung")
+    model: str = Field(..., description="Device model name")
+    issue: str = Field(..., description="Lock type or issue to resolve")
+    imei: str = Field(..., min_length=8, max_length=20, description="IMEI or serial number")
+    region: Optional[str] = Field(None, description="Carrier/region the device is locked to")
+    name: str = Field(..., description="Customer full name")
+    email: EmailStr = Field(..., description="Customer email for updates")
+    notes: Optional[str] = Field(None, description="Additional context or instructions")
+    status: Literal['new', 'in_progress', 'completed', 'failed'] = Field('new', description="Processing status")

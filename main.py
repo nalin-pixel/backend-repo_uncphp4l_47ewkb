@@ -1,8 +1,13 @@
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import List, Optional
 
-app = FastAPI()
+from database import create_document, get_documents
+from schemas import UnlockRequest
+
+app = FastAPI(title="Phone Unlock Service API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -14,7 +19,7 @@ app.add_middleware(
 
 @app.get("/")
 def read_root():
-    return {"message": "Hello from FastAPI Backend!"}
+    return {"message": "Phone Unlock Service Backend Running"}
 
 @app.get("/api/hello")
 def hello():
@@ -33,7 +38,6 @@ def test_database():
     }
     
     try:
-        # Try to import database module
         from database import db
         
         if db is not None:
@@ -42,10 +46,9 @@ def test_database():
             response["database_name"] = db.name if hasattr(db, 'name') else "✅ Connected"
             response["connection_status"] = "Connected"
             
-            # Try to list collections to verify connectivity
             try:
                 collections = db.list_collection_names()
-                response["collections"] = collections[:10]  # Show first 10 collections
+                response["collections"] = collections[:10]
                 response["database"] = "✅ Connected & Working"
             except Exception as e:
                 response["database"] = f"⚠️  Connected but Error: {str(e)[:50]}"
@@ -57,12 +60,36 @@ def test_database():
     except Exception as e:
         response["database"] = f"❌ Error: {str(e)[:50]}"
     
-    # Check environment variables
     import os
     response["database_url"] = "✅ Set" if os.getenv("DATABASE_URL") else "❌ Not Set"
     response["database_name"] = "✅ Set" if os.getenv("DATABASE_NAME") else "❌ Not Set"
     
     return response
+
+# API models for responses
+class UnlockResponse(BaseModel):
+    id: str
+    message: str
+
+@app.post("/api/unlock", response_model=UnlockResponse)
+def submit_unlock_request(payload: UnlockRequest):
+    try:
+        doc_id = create_document("unlockrequest", payload)
+        return {"id": doc_id, "message": "Request received. We'll email you with next steps."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/unlock", response_model=List[dict])
+def list_unlock_requests(limit: Optional[int] = 50):
+    try:
+        docs = get_documents("unlockrequest", limit=limit)
+        # Convert ObjectId to str if present
+        for d in docs:
+            if "_id" in d:
+                d["_id"] = str(d["_id"])
+        return docs
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":
